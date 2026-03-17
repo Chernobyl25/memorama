@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Forsaken Casino - Panic Mode</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  </head>
+  <body>
+    <a-scene webxr="optionalFeatures: hit-test, local-floor" background="color: #000000" renderer="antialias: true; colorManagement: true">
+      
+      <a-assets>
+        <img id="pisoTex" src="https://i.imgur.com/2Xy7m60.jpeg">
+        <img id="metalTex" src="https://i.imgur.com/H5YtX5m.jpeg">
+        <img id="back" src="https://i.imgur.com/kSly8L1.jpg">
+        <img id="img1" src="https://picsum.photos/id/1011/300/450">
+        <img id="img2" src="https://picsum.photos/id/1015/300/450">
+        <img id="img3" src="https://picsum.photos/id/1016/300/450">
+        <img id="img4" src="https://picsum.photos/id/1025/300/450">
+        
+        <audio id="panicSound" src="https://cdn.pixabay.com/audio/2022/03/10/audio_c330f65349.mp3" preload="auto"></audio>
+      </a-assets>
+
+      <a-entity id="rig" position="0 0 1">
+        <a-entity id="camera" camera look-controls wasd-controls position="0 1.6 0"
+                  animation="property: position; from: -0.01 1.6 -0.01; to: 0.01 1.61 0.01; dur: 40; loop: true; dir: alternate; enabled: false">
+          <a-cursor raycaster="objects: .clickable" material="color: #ff0000; shader: flat" scale="0.5 0.5 0.5"></a-cursor>
+          <a-text id="timerText" value="TIEMPO: 40s" color="#ff0000" position="0 0.5 -0.8" scale="0.4 0.4 0.4" align="center" shader="flat"></a-text>
+        </a-entity>
+        
+        <a-entity oculus-touch-controls="hand: left" model="false"></a-entity>
+        <a-entity oculus-touch-controls="hand: right" laser-controls raycaster="objects: .clickable; far: 5"></a-entity>
+      </a-entity>
+
+      <a-entity id="panicAudio" sound="src: #panicSound; loop: false; volume: 1"></a-entity>
+
+      <a-light type="ambient" color="#555"></a-light>
+      <a-light id="mainLight" type="spot" position="0 3.8 -0.5" color="#fff" intensity="1.5" angle="50"></a-light>
+
+      <a-plane src="#pisoTex" rotation="-90 0 0" width="20" height="20" repeat="10 10" material="color: #444"></a-plane>
+      <a-box src="#metalTex" position="0 2.5 -5" width="12" height="5" depth="0.5" color="#666"></a-box>
+
+      <a-entity id="mesa" position="0 0 -0.5">
+          <a-cylinder color="#444" radius="0.08" height="0.9" position="0 0.45 0"></a-cylinder>
+          <a-cylinder color="#3a2a1a" radius="0.65" height="0.1" position="0 0.9 0">
+              <a-cylinder color="#008000" radius="0.6" height="0.02" position="0 0.06 0" material="shader: flat">
+                  <a-entity id="board" position="0 0.03 0" rotation="-90 0 0" scale="0.45 0.45 0.45"></a-entity>
+              </a-cylinder>
+          </a-cylinder>
+          <a-ring color="#ff0000" radius-inner="0.63" radius-outer="0.66" position="0 0.96 0" rotation="-90 0 0" material="shader: flat"></a-ring>
+      </a-entity>
+
+      <a-text id="statusText" value="" color="#ff0000" position="0 2.5 -4" scale="3 3 3" align="center" shader="flat"></a-text>
+
+    </a-scene>
+
+    <script>
+      const board = document.querySelector('#board');
+      const timerText = document.querySelector('#timerText');
+      const statusText = document.querySelector('#statusText');
+      const camera = document.querySelector('#camera');
+      const panicAudio = document.querySelector('#panicAudio');
+      
+      let timeLeft = 40;
+      let timerInterval;
+      let gameActive = false;
+      let pairsFound = 0;
+      let lockBoard = false;
+      const cardData = ['img1', 'img1', 'img2', 'img2', 'img3', 'img3', 'img4', 'img4'];
+
+      function startTimer() {
+          if(!gameActive) {
+              gameActive = true;
+              timerInterval = setInterval(() => {
+                  timeLeft--;
+                  timerText.setAttribute('value', `TIEMPO: ${timeLeft}s`);
+                  
+                  // EFECTO DE PÁNICO A LOS 10 SEGUNDOS
+                  if(timeLeft === 10) {
+                      // Activar vibración de cámara violenta
+                      camera.setAttribute('animation', 'enabled', 'true');
+                      // Reproducir música de pánico
+                      panicAudio.components.sound.playSound();
+                      // Tinte rojo suave a la escena (opcional para visual)
+                      document.querySelector('a-scene').setAttribute('background', 'color: #1a0000');
+                  }
+                  
+                  if(timeLeft <= 0) die();
+              }, 1000);
+          }
+      }
+
+      function die() {
+          clearInterval(timerInterval);
+          camera.setAttribute('animation', 'enabled', 'false');
+          panicAudio.components.sound.stopSound();
+          statusText.setAttribute('value', 'PERDISTE');
+          setTimeout(() => location.reload(), 3000);
+      }
+
+      function initGame() {
+          board.innerHTML = '';
+          const shuffled = [...cardData].sort(() => Math.random() - 0.5);
+          shuffled.forEach((imgId, index) => {
+              const x = ((index % 4) - 1.5) * 0.75;
+              const y = (Math.floor(index / 4) - 0.5) * -1.1;
+              
+              const card = document.createElement('a-box');
+              card.setAttribute('position', `${x} ${y} 0.05`);
+              card.setAttribute('width', '0.6');
+              card.setAttribute('height', '0.9');
+              card.setAttribute('depth', '0.04');
+              card.setAttribute('material', 'src: #back; shader: flat');
+              card.setAttribute('class', 'clickable');
+              
+              card.dataset.id = imgId;
+              card.dataset.flipped = "false";
+
+              card.addEventListener('mousedown', function() {
+                  if (lockBoard || this.dataset.flipped === "true" || timeLeft <= 0) return;
+                  startTimer();
+                  flip(this);
+              });
+              board.appendChild(card);
+          });
+      }
+
+      function flip(card) {
+          card.dataset.flipped = "true";
+          card.setAttribute('animation', 'property: rotation; to: 0 180 0; dur: 300');
+          setTimeout(() => card.setAttribute('material', 'src: #' + card.dataset.id + '; shader: flat'), 150);
+
+          let active = Array.from(document.querySelectorAll('.clickable')).filter(c => c.dataset.flipped === "true" && !c.dataset.matched);
+
+          if (active.length === 2) {
+              lockBoard = true;
+              const [c1, c2] = active;
+              if (c1.dataset.id === c2.dataset.id) {
+                  setTimeout(() => {
+                      c1.setAttribute('scale', '0 0 0');
+                      c2.setAttribute('scale', '0 0 0');
+                      c1.dataset.matched = "true";
+                      c2.dataset.matched = "true";
+                      pairsFound++;
+                      lockBoard = false;
+                      if (pairsFound === 4) win();
+                  }, 500);
+              } else {
+                  setTimeout(() => {
+                      c1.setAttribute('animation__back', 'property: rotation; to: 0 0 0; dur: 300');
+                      c2.setAttribute('animation__back', 'property: rotation; to: 0 0 0; dur: 300');
+                      setTimeout(() => {
+                          c1.setAttribute('material', 'src: #back; shader: flat');
+                          c2.setAttribute('material', 'src: #back; shader: flat');
+                          c1.dataset.flipped = "false";
+                          c2.dataset.flipped = "false";
+                          lockBoard = false;
+                      }, 150);
+                  }, 700);
+              }
+          }
+      }
+
+      function win() {
+          clearInterval(timerInterval);
+          camera.setAttribute('animation', 'enabled', 'false');
+          panicAudio.components.sound.stopSound();
+          statusText.setAttribute('value', 'LIBRE');
+          setTimeout(() => location.reload(), 4000);
+      }
+
+      initGame();
+    </script>
+  </body>
+</html>
