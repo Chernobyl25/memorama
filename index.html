@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Forsaken Casino - Panic Mode</title>
+    <title>Forsaken Casino - Fixed Rotation</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   </head>
   <body>
-    <a-scene webxr="optionalFeatures: hit-test, local-floor" background="color: #000000" renderer="antialias: true; colorManagement: true">
+    <a-scene background="color: #000000" renderer="antialias: true; colorManagement: true">
       
       <a-assets>
         <img id="pisoTex" src="https://i.imgur.com/2Xy7m60.jpeg">
@@ -15,7 +15,6 @@
         <img id="img2" src="https://picsum.photos/id/1015/300/450">
         <img id="img3" src="https://picsum.photos/id/1016/300/450">
         <img id="img4" src="https://picsum.photos/id/1025/300/450">
-        
         <audio id="panicSound" src="https://cdn.pixabay.com/audio/2022/03/10/audio_c330f65349.mp3" preload="auto"></audio>
       </a-assets>
 
@@ -25,15 +24,12 @@
           <a-cursor raycaster="objects: .clickable" material="color: #ff0000; shader: flat" scale="0.5 0.5 0.5"></a-cursor>
           <a-text id="timerText" value="TIEMPO: 40s" color="#ff0000" position="0 0.5 -0.8" scale="0.4 0.4 0.4" align="center" shader="flat"></a-text>
         </a-entity>
-        
-        <a-entity oculus-touch-controls="hand: left" model="false"></a-entity>
-        <a-entity oculus-touch-controls="hand: right" laser-controls raycaster="objects: .clickable; far: 5"></a-entity>
       </a-entity>
 
-      <a-entity id="panicAudio" sound="src: #panicSound; loop: false; volume: 1"></a-entity>
+      <a-entity id="panicAudioEntity" sound="src: #panicSound; loop: false; volume: 1"></a-entity>
 
       <a-light type="ambient" color="#555"></a-light>
-      <a-light id="mainLight" type="spot" position="0 3.8 -0.5" color="#fff" intensity="1.5" angle="50"></a-light>
+      <a-light type="spot" position="0 3.8 -0.5" color="#fff" intensity="1.5" angle="50"></a-light>
 
       <a-plane src="#pisoTex" rotation="-90 0 0" width="20" height="20" repeat="10 10" material="color: #444"></a-plane>
       <a-box src="#metalTex" position="0 2.5 -5" width="12" height="5" depth="0.5" color="#666"></a-box>
@@ -57,7 +53,7 @@
       const timerText = document.querySelector('#timerText');
       const statusText = document.querySelector('#statusText');
       const camera = document.querySelector('#camera');
-      const panicAudio = document.querySelector('#panicAudio');
+      const panicEntity = document.querySelector('#panicAudioEntity');
       
       let timeLeft = 40;
       let timerInterval;
@@ -72,17 +68,11 @@
               timerInterval = setInterval(() => {
                   timeLeft--;
                   timerText.setAttribute('value', `TIEMPO: ${timeLeft}s`);
-                  
-                  // EFECTO DE PÁNICO A LOS 10 SEGUNDOS
                   if(timeLeft === 10) {
-                      // Activar vibración de cámara violenta
                       camera.setAttribute('animation', 'enabled', 'true');
-                      // Reproducir música de pánico
-                      panicAudio.components.sound.playSound();
-                      // Tinte rojo suave a la escena (opcional para visual)
+                      if (panicEntity.components.sound) panicEntity.components.sound.playSound();
                       document.querySelector('a-scene').setAttribute('background', 'color: #1a0000');
                   }
-                  
                   if(timeLeft <= 0) die();
               }, 1000);
           }
@@ -91,7 +81,6 @@
       function die() {
           clearInterval(timerInterval);
           camera.setAttribute('animation', 'enabled', 'false');
-          panicAudio.components.sound.stopSound();
           statusText.setAttribute('value', 'PERDISTE');
           setTimeout(() => location.reload(), 3000);
       }
@@ -123,20 +112,33 @@
           });
       }
 
+      // FUNCIÓN DE GIRO CORREGIDA
       function flip(card) {
           card.dataset.flipped = "true";
-          card.setAttribute('animation', 'property: rotation; to: 0 180 0; dur: 300');
-          setTimeout(() => card.setAttribute('material', 'src: #' + card.dataset.id + '; shader: flat'), 150);
+          
+          // Animación explícita de A-Frame
+          card.setAttribute('animation', {
+            property: 'rotation',
+            to: '0 180 0',
+            dur: 300,
+            easing: 'easeOutQuad'
+          });
+
+          // Cambio de textura justo a la mitad del giro para que se vea natural
+          setTimeout(() => {
+              card.setAttribute('material', 'src: #' + card.dataset.id);
+          }, 150);
 
           let active = Array.from(document.querySelectorAll('.clickable')).filter(c => c.dataset.flipped === "true" && !c.dataset.matched);
 
           if (active.length === 2) {
               lockBoard = true;
               const [c1, c2] = active;
+              
               if (c1.dataset.id === c2.dataset.id) {
                   setTimeout(() => {
-                      c1.setAttribute('scale', '0 0 0');
-                      c2.setAttribute('scale', '0 0 0');
+                      c1.setAttribute('visible', 'false');
+                      c2.setAttribute('visible', 'false');
                       c1.dataset.matched = "true";
                       c2.dataset.matched = "true";
                       pairsFound++;
@@ -145,24 +147,24 @@
                   }, 500);
               } else {
                   setTimeout(() => {
-                      c1.setAttribute('animation__back', 'property: rotation; to: 0 0 0; dur: 300');
-                      c2.setAttribute('animation__back', 'property: rotation; to: 0 0 0; dur: 300');
+                      // Regresar a la posición original
+                      c1.setAttribute('animation', 'to: 0 0 0');
+                      c2.setAttribute('animation', 'to: 0 0 0');
+                      
                       setTimeout(() => {
-                          c1.setAttribute('material', 'src: #back; shader: flat');
-                          c2.setAttribute('material', 'src: #back; shader: flat');
+                          c1.setAttribute('material', 'src: #back');
+                          c2.setAttribute('material', 'src: #back');
                           c1.dataset.flipped = "false";
                           c2.dataset.flipped = "false";
                           lockBoard = false;
                       }, 150);
-                  }, 700);
+                  }, 800);
               }
           }
       }
 
       function win() {
           clearInterval(timerInterval);
-          camera.setAttribute('animation', 'enabled', 'false');
-          panicAudio.components.sound.stopSound();
           statusText.setAttribute('value', 'LIBRE');
           setTimeout(() => location.reload(), 4000);
       }
